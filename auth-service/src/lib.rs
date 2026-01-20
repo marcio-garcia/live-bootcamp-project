@@ -1,3 +1,8 @@
+pub mod routes;
+pub mod domain;
+pub mod services;
+pub mod app_state;
+
 use std::error::Error;
 use axum::{
     routing::{get_service, post},
@@ -13,8 +18,7 @@ use routes::{
     verify_2fa,
     verify_token,
 };
-
-pub mod routes;
+use app_state::AppState;
 
 // This struct encapsulates our application-related logic.
 pub struct Application {
@@ -25,20 +29,19 @@ pub struct Application {
 }
 
 impl Application {
-    pub async fn build(address: &str) -> Result<Self, Box<dyn Error>> {
-        // let assets_dir = ServeDir::new("assets")
-        //     .not_found_service(ServeFile::new("assets/index.html"));
+    pub async fn build(app_state: AppState, address: &str) -> Result<Self, Box<dyn Error>> {
         let assets = get_service(
             ServeDir::new("assets")
                 .not_found_service(ServeFile::new("assets/index.html"))
         );
         let router = Router::new()
+            .fallback_service(assets)
             .route("/signup", post(signup))
             .route("/login", post(login))
-            .route("/logout", post(logout))
             .route("/verify-2fa", post(verify_2fa))
+            .route("/logout", post(logout))
             .route("/verify-token", post(verify_token))
-            .fallback_service(assets);
+            .with_state(app_state);
 
         let listener = tokio::net::TcpListener::bind(address).await?;
         let address = listener.local_addr()?.to_string();
